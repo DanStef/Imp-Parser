@@ -1,0 +1,353 @@
+import java.util.*;
+
+
+%%
+%standalone
+
+
+%init{
+
+%init}
+
+%{
+	public Stack<Statement> stack = new Stack<>();
+
+
+
+
+%}
+
+integer = [0-9]*
+varname = [a-z]+
+atr = "="
+plus = "+"
+pctv = ";"
+div = "/"
+pdeschisa = "("
+pinchisa = ")"
+adeschisa = "{"
+ainchisa = "}"
+if = "if"
+else = "else"
+whitespace = "\t"+ | "\n"+ | " "+
+maimare = ">"
+boolconst = "true" | "false"
+negatie = "!"
+and = "&&"
+while = "while"
+
+%%
+
+{if} {
+	stack.push(new IfStatement());
+}
+
+{else} {
+	stack.push(new ElseStatement());
+}
+
+{while} {
+	stack.push(new While());
+}
+
+{boolconst} {
+
+	BoolVal b = new BoolVal();
+	b.value = Boolean.parseBoolean(yytext());
+	if(stack.peek() instanceof Neg) {
+		Neg n = (Neg) stack.pop();
+		Neg cop = n;
+		while(cop.s instanceof Neg) {
+			// System.out.println("1");
+			cop = (Neg)cop.s;
+		}
+		cop.s = b;
+		stack.push(n);
+		// n.s = b;
+		// stack.push(n);
+	} else {
+		stack.push(b);
+	}
+}
+
+{negatie} {
+	Neg n = new Neg();
+	// stack.push(n);
+	if(stack.size() > 0 && stack.peek() instanceof Neg) {
+		Neg n2 = (Neg) stack.pop();
+		Neg cop = n2;
+		while(cop.s instanceof Neg) {
+			// System.out.println("1");
+			cop = (Neg)cop.s;
+		}
+		cop.s = n;
+		// stack.push(n);
+		// n2.s = n;
+		stack.push(n2);
+	} else {
+		stack.push(n);
+	}
+
+	// System.out.println(stack.toString());
+}
+
+{and} {
+	And a = new And();
+	// Statement below = stack.pop();
+	// a.left = below;
+	// stack.push(a);
+
+	while(true) {
+		// System.out.println(stack.toString());
+		Statement belowValue = stack.pop();
+		Statement belowOp = stack.pop();
+
+		// System.out.println("bv:"+belowValue);
+		// System.out.println("bo:"+belowOp);
+
+		if(belowOp instanceof Paranteza) {
+			// ((Paranteza)belowOp).inside = belowValue;
+			// System.out.println("in if");
+			stack.push(belowOp);
+			a.left = belowValue;
+			stack.push(a);
+			break;
+		} else if(belowOp instanceof MaiMare) {
+			((MaiMare) belowOp).right = belowValue;
+			// stack.push(belowOp);
+			stack.push(belowOp);
+		} else if(belowOp instanceof Arith) {
+			((Arith) belowOp).right = belowValue;
+			// stack.push(belowOp);
+			stack.push(belowOp);
+		}
+	}
+}
+
+
+{integer} {
+	
+	stack.push(new Value(Integer.parseInt(yytext())));
+
+}
+
+{varname} {
+	stack.push(new Variable(yytext()));
+}
+
+{atr} {
+	Atr a = new Atr();
+	Statement var = stack.pop();
+	Variable aa = (Variable) var;
+	a.v = aa;
+	stack.push(a);
+}
+
+{plus} {
+	
+	Add a = new Add();
+
+	Statement below = stack.pop();
+
+
+	if(stack.peek() instanceof Atr || stack.peek() instanceof Paranteza || stack.peek() instanceof MaiMare || stack.peek() instanceof And) {
+		a.left = below;
+	} else {
+
+		Statement s = stack.pop();
+		//System.out.println("s:"+s.toString());
+		if(s instanceof Arith) {
+			//System.out.println("s:"+s.toString());
+			// Arith b = (Arith)stack.pop();
+			Arith b = (Arith)s;
+			b.right = below;
+			a.left = b;
+		} else {
+			a.left = s;
+		}
+
+	}
+
+
+	stack.push(a);
+}
+
+{pctv} {
+
+	while(true) {
+
+		Statement belowValue = stack.pop();
+		Statement belowOp = stack.pop();
+
+		if(belowOp instanceof Atr) {
+			((Atr)belowOp).value = belowValue;
+			stack.push(belowOp);
+			break;
+		} else if(belowOp instanceof Arith){
+			((Arith) belowOp).right = belowValue;
+			stack.push(belowOp);
+		}
+
+	}
+}
+
+{div} {
+	
+	Division d = new Division();
+
+
+	Statement below = stack.pop();
+
+	d.left = below;
+
+
+	stack.push(d);
+}
+
+{pdeschisa} {
+
+	stack.add(new Paranteza());
+
+}
+
+{pinchisa} {
+	while(true) {
+		//System.out.println(stack.toString());
+		Statement belowValue = stack.pop();
+
+		Statement belowOp = stack.pop();
+		// System.out.println("bv:"+belowValue);
+		// System.out.println("bo:"+belowOp);
+
+		if(belowOp instanceof Paranteza) {
+			((Paranteza)belowOp).inside = belowValue;
+			stack.push(belowOp);
+			break;
+		} else if(belowOp instanceof Arith){
+			((Arith) belowOp).right = belowValue;
+			stack.push(belowOp);
+		} else if(belowOp instanceof Atr) {
+			((Atr) belowOp).value = belowValue;
+			stack.push(belowOp);
+		} else if(belowOp instanceof MaiMare) {
+			((MaiMare) belowOp).right = belowValue;
+			stack.push(belowOp);
+		} else if(belowOp instanceof And) {
+			((And) belowOp).right = belowValue;
+			stack.push(belowOp);
+		}
+	}
+
+	// System.out.println(stack.toString());
+
+	Statement paranteza = stack.pop();
+
+	if(stack.peek() instanceof IfStatement) {
+		IfStatement i = (IfStatement) stack.pop();
+		i.condition = paranteza;
+		stack.push(i);
+	} else if(stack.peek() instanceof While) {
+		While w = (While) stack.pop();
+		w.cond = paranteza;
+		stack.push(w);
+	} else if(stack.peek() instanceof Neg) {
+
+		Neg n = (Neg)stack.pop();
+		Neg cop = n;
+		while(cop.s instanceof Neg) {
+			// System.out.println("1");
+			cop = (Neg)cop.s;
+		}
+		cop.s = paranteza;
+		stack.push(n);
+	} else {
+		stack.push(paranteza);
+	}
+
+}
+
+{adeschisa} {
+
+	stack.push(new Block());
+
+}
+
+{ainchisa} {
+
+	ArrayList<Statement> a = new ArrayList<>();
+	while(true) {
+		Statement belowOp = stack.pop();
+
+		if(belowOp instanceof Block) {
+			Collections.reverse(a); 
+			((Block)belowOp).statements = a;
+			stack.push(belowOp);
+			break;
+		} else {
+			a.add(belowOp);
+		}
+
+	}
+
+	//If {} is part of an if first clause/second clause
+
+	Statement acolada = stack.pop();
+
+	if(stack.peek() instanceof IfStatement) {
+		IfStatement i = (IfStatement) stack.pop();
+		i.case1 = acolada;
+		stack.push(i);
+	} else if(stack.peek() instanceof ElseStatement){
+		stack.pop();
+		IfStatement i = (IfStatement) stack.pop();
+		i.case2 = acolada;
+		stack.push(i);
+	} else if(stack.peek() instanceof While){
+		While w = (While) stack.pop();
+		w.block = acolada;
+		stack.push(w);
+	} else {
+		stack.push(acolada);
+	}
+
+}
+
+{maimare} {
+
+	MaiMare m = new MaiMare();
+	while(true) {
+		// System.out.println(stack.toString());
+		Statement belowValue = stack.pop();
+		Statement belowOp = stack.pop();
+
+		// System.out.println("bv:"+belowValue);
+		// System.out.println("bo:"+belowOp);
+
+		if(belowOp instanceof Paranteza) {
+			// ((Paranteza)belowOp).inside = belowValue;
+			// System.out.println("in if");
+			stack.push(belowOp);
+			m.left = belowValue;
+			stack.push(m);
+			break;
+		} else if(belowOp instanceof Arith){
+			((Arith) belowOp).right = belowValue;
+			stack.push(belowOp);
+		} else if(belowOp instanceof And) {
+			((And) belowOp).right = m;
+			// stack.push(belowOp);
+
+			stack.push(belowOp);
+			m.left = belowValue;
+			stack.push(m);
+			break;
+		}
+	}
+	// stack.push(m);
+}
+
+{whitespace} {
+
+}
+
+. {}
